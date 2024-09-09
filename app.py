@@ -46,14 +46,6 @@ def get_prediction(image_data):
   return response, score
 
 
-#creating the web app
-st.markdown("""
-<style>
-body {
-    background-color: #C83FE2;
-}
-</style>
-""", unsafe_allow_html=True)
 #setting up the title
 st.title("Cataract Image Classifier")#change according to your project
 #setting up the subheader

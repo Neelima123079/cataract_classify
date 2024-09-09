@@ -89,7 +89,7 @@ with tab2:
 
   # URL of the PDF file in the GitHub repository
   # sample url -> "https://raw.githubusercontent.com/yourusername/yourrepository/branch/yourfile.pdf"
-  pdf_url = "https://raw.githubusercontent.com/Neelima123079/cataract_classify/main/sample.pdf"
+  pdf_url = "https://raw.githubusercontent.com/Neelima123079/cataract_classify/main/Cataract Classifier project report.pdf"
 
   # Fetch the PDF file from GitHub
   response = requests.get(pdf_url)

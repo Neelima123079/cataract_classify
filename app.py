@@ -1,26 +1,3 @@
-import streamlit as st
-import json
-import requests
-import base64
-from PIL import Image
-import io
-from streamlit_pdf_viewer import pdf_viewer
-
-
-
-#these are main classes your image is trained on
-#you can define the classes in alphabectical order
-PREDICTED_LABELS = ["Cataract","Normal"]  # edit 1
-PREDICTED_LABELS.sort()
-
-def get_prediction(image_data):
-  #replace your image classification ai service URL
-  url = 'https://askai.aiclub.world/6d861d00-26a8-4b6d-b74e-d5e77f654dfc'  #Edit 2
-  r = requests.post(url, data=image_data)
-  response = r.json()['predicted_label']
-  score = r.json()['score']
-  #print("Predicted_label: {} and confidence_score: {}".format(response,score))
-  return response, score
 %%writefile app.py
 import streamlit as st
 import json

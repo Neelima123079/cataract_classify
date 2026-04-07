@@ -19,7 +19,7 @@ import os
 import streamlit as st
 import tensorflow as tf
 
-MODEL_PATH = "cataract_new.keras"
+MODEL_PATH = "cataract_resaved.h5"
 
 
 def load_model():

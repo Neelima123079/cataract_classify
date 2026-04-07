@@ -65,7 +65,11 @@ def predict(image_np):
     image_np = np.expand_dims(image_np, axis=0)
     preds = model.predict(image_np, verbose=0)[0]
     return preds
-
+preds = predict(image_np)
+st.write("Raw prediction scores:", preds.tolist())
+pred_idx = int(np.argmax(preds))
+st.write("Predicted index:", pred_idx)
+st.write("Predicted label:", CLASS_NAMES[pred_idx])
 # =========================
 # LIME
 # =========================

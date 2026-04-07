@@ -8,7 +8,7 @@ from streamlit_pdf_viewer import pdf_viewer
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
-MODEL_PATH = "best_model_cataract1.h5"
+MODEL_PATH = "cataract_new.keras"
 IMG_SIZE = 224
 CLASS_NAMES = ["Normal", "Cataract"]
 BINARY_SIGMOID_OUTPUT = True

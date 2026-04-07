@@ -75,7 +75,7 @@ def get_explainer():
 
 def explain(image_np):
     explainer = get_explainer()
-
+lime_img = np.clip(lime_img, 0, 1)
     explanation = explainer.explain_instance(
         image_np.astype("double"),
         classifier_fn=lambda x: model.predict(x),

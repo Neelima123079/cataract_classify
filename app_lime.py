@@ -8,15 +8,20 @@ from streamlit_pdf_viewer import pdf_viewer
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
-MODEL_PATH = "cataract_new.keras"
+
 IMG_SIZE = 224
 CLASS_NAMES = ["Normal", "Cataract"]
 BINARY_SIGMOID_OUTPUT = True
 LIME_NUM_SAMPLES = 1000
 LIME_NUM_FEATURES = 5
 
-@st.cache_resource
+MODEL_PATH = "cataract_new.keras"
+
 def load_model():
+    st.write("Current working directory:", os.getcwd())
+    st.write("Files in app folder:", os.listdir("."))
+    st.write("Trying to load model from:", MODEL_PATH)
+    st.write("File exists:", os.path.exists(MODEL_PATH))
     return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 model = load_model()

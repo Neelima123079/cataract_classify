@@ -1,3 +1,4 @@
+
 import streamlit as st
 import numpy as np
 import tensorflow as tf
@@ -8,30 +9,50 @@ from streamlit_pdf_viewer import pdf_viewer
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
+from tensorflow.keras.models import Model
 
+# =========================
+# CONFIG
+# =========================
+WEIGHTS_PATH = "best_model_cataract1.h5"
 IMG_SIZE = 224
 CLASS_NAMES = ["Normal", "Cataract"]
-BINARY_SIGMOID_OUTPUT = True
+BINARY_SIGMOID_OUTPUT = False   # IMPORTANT: your model has 2 outputs
 LIME_NUM_SAMPLES = 1000
 LIME_NUM_FEATURES = 5
 
-import os
-import streamlit as st
-import tensorflow as tf
+# =========================
+# BUILD MODEL ARCHITECTURE
+# =========================
+def build_model():
+    base_model = MobileNetV2(
+        input_shape=(IMG_SIZE, IMG_SIZE, 3),
+        include_top=False,
+        weights=None,
+        alpha=0.35
+    )
 
-MODEL_PATH = "cataract_final.keras"
-BINARY_SIGMOID_OUTPUT = False
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(100, activation="relu", use_bias=True)(x)
+    output = Dense(2, activation="softmax", use_bias=False)(x)
 
+    model = Model(inputs=base_model.input, outputs=output)
+    return model
 
+@st.cache_resource
 def load_model():
-    st.write("Current working directory:", os.getcwd())
-    st.write("Files in app folder:", os.listdir("."))
-    st.write("Trying to load model from:", MODEL_PATH)
-    st.write("File exists:", os.path.exists(MODEL_PATH))
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    model = build_model()
+    model.load_weights(WEIGHTS_PATH)
+    return model
 
 model = load_model()
 
+# =========================
+# PREPROCESSING
+# =========================
 def preprocess_pil(img: Image.Image) -> np.ndarray:
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
@@ -66,6 +87,9 @@ def predict_single(image_np):
     pred_idx = int(np.argmax(probs))
     return pred_idx, probs
 
+# =========================
+# LIME EXPLAINER
+# =========================
 @st.cache_resource
 def get_explainer():
     return lime_image.LimeImageExplainer()
@@ -96,6 +120,9 @@ def explain_image(image_np):
     lime_vis = mark_boundaries(temp, mask)
     return pred_idx, probs, lime_vis
 
+# =========================
+# STREAMLIT UI
+# =========================
 st.set_page_config(page_title="Cataract Classifier with LIME", layout="wide")
 st.title("Cataract Image Classifier Web App with Explainability")
 

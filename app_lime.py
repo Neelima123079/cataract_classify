@@ -1,10 +1,8 @@
-
 import streamlit as st
 import numpy as np
 import tensorflow as tf
 from PIL import Image
-import requests
-from streamlit_pdf_viewer import pdf_viewer
+import gc
 
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
@@ -19,12 +17,13 @@ from tensorflow.keras.models import Model
 WEIGHTS_PATH = "best_model_cataract1.h5"
 IMG_SIZE = 224
 CLASS_NAMES = ["Normal", "Cataract"]
-BINARY_SIGMOID_OUTPUT = False   # IMPORTANT: your model has 2 outputs
-LIME_NUM_SAMPLES = 1000
-LIME_NUM_FEATURES = 5
+
+# Reduced for memory safety
+LIME_NUM_SAMPLES = 120
+LIME_NUM_FEATURES = 4
 
 # =========================
-# BUILD MODEL ARCHITECTURE
+# BUILD MODEL
 # =========================
 def build_model():
     base_model = MobileNetV2(
@@ -36,7 +35,7 @@ def build_model():
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
-    x = Dense(100, activation="relu", use_bias=True)(x)
+    x = Dense(100, activation="relu")(x)
     output = Dense(2, activation="softmax", use_bias=False)(x)
 
     model = Model(inputs=base_model.input, outputs=output)
@@ -51,61 +50,39 @@ def load_model():
 model = load_model()
 
 # =========================
-# PREPROCESSING
+# PREPROCESS
 # =========================
-def preprocess_pil(img: Image.Image) -> np.ndarray:
+def preprocess(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
     arr = np.array(img).astype("float32") / 255.0
     return arr
 
-def predict_fn(images):
-    batch = []
-    for img in images:
-        if isinstance(img, np.ndarray):
-            pil_img = Image.fromarray(img.astype("uint8"))
-        else:
-            pil_img = img
-        batch.append(preprocess_pil(pil_img))
-
-    batch = np.array(batch, dtype=np.float32)
-    preds = model.predict(batch, verbose=0)
-    preds = np.array(preds)
-
-    if BINARY_SIGMOID_OUTPUT:
-        preds = preds.reshape(-1, 1)
-        probs = np.hstack([1 - preds, preds])
-        return probs
-
-    if preds.ndim == 2 and preds.shape[1] == 2:
-        return preds
-
-    raise ValueError(f"Unexpected model output shape: {preds.shape}")
-
-def predict_single(image_np):
-    probs = predict_fn([image_np])[0]
-    pred_idx = int(np.argmax(probs))
-    return pred_idx, probs
+def predict(image_np):
+    image_np = np.expand_dims(image_np, axis=0)
+    preds = model.predict(image_np, verbose=0)[0]
+    return preds
 
 # =========================
-# LIME EXPLAINER
+# LIME
 # =========================
 @st.cache_resource
 def get_explainer():
     return lime_image.LimeImageExplainer()
 
-def explain_image(image_np):
+def explain(image_np):
     explainer = get_explainer()
 
     explanation = explainer.explain_instance(
         image_np.astype("double"),
-        classifier_fn=predict_fn,
+        classifier_fn=lambda x: model.predict(x),
         top_labels=2,
         hide_color=0,
         num_samples=LIME_NUM_SAMPLES
     )
 
-    pred_idx, probs = predict_single(image_np)
+    preds = predict(image_np)
+    pred_idx = int(np.argmax(preds))
 
     temp, mask = explanation.get_image_and_mask(
         label=pred_idx,
@@ -117,91 +94,41 @@ def explain_image(image_np):
     if temp.max() > 1:
         temp = temp / 255.0
 
-    lime_vis = mark_boundaries(temp, mask)
-    return pred_idx, probs, lime_vis
+    return mark_boundaries(temp, mask), preds, pred_idx
 
 # =========================
-# STREAMLIT UI
+# UI
 # =========================
-st.set_page_config(page_title="Cataract Classifier with LIME", layout="wide")
-st.title("Cataract Image Classifier Web App with Explainability")
+st.set_page_config(page_title="Cataract XAI App", layout="wide")
+st.title("Cataract Detection with Explainable AI")
 
-tab1, tab2 = st.tabs(["Make Prediction", "View Report"])
+uploaded_file = st.file_uploader("Upload Eye Image", type=["jpg", "png", "jpeg"])
 
-with tab1:
-    st.header("Cataract and Normal Eye Image Classifier")
-    st.subheader("Upload an image for prediction and explanation")
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    image_np = preprocess(image)
 
-    uploaded_file = st.file_uploader(
-        label="Upload an eye image",
-        type=["jpg", "jpeg", "png"],
-        accept_multiple_files=False
-    )
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file).convert("RGB")
-        image_np = np.array(image)
+    # Prediction button
+    if st.button("🔍 Run Prediction"):
+        preds = predict(image_np)
+        pred_idx = int(np.argmax(preds))
 
-        file_details = {
-            "file name": uploaded_file.name,
-            "file type": uploaded_file.type,
-            "file size": uploaded_file.size
-        }
+        st.success(f"Prediction: {CLASS_NAMES[pred_idx]}")
+        st.write("Confidence:", float(preds[pred_idx]))
 
-        col1, col2 = st.columns(2)
+    # LIME button (separate!)
+    if st.button("🧠 Generate Explanation (LIME)"):
+        with st.spinner("Generating explanation..."):
+            lime_img, preds, pred_idx = explain(image_np)
 
-        with col1:
-            st.write("### Uploaded Image")
-            st.write(file_details)
-            st.image(image, use_container_width=True)
+        st.image(lime_img, caption="LIME Explanation", use_container_width=True)
 
-        with st.spinner("Running prediction and generating LIME explanation..."):
-            pred_idx, probs, lime_vis = explain_image(image_np)
+        # Free memory
+        del lime_img
+        gc.collect()
 
-        with col2:
-            st.write("### Prediction Result")
-            st.metric("Prediction Label", CLASS_NAMES[pred_idx])
-            st.metric("Confidence Score", f"{float(probs[pred_idx]):.4f}")
-
-            st.write("### Class Probabilities")
-            st.write({
-                "Normal": float(probs[0]),
-                "Cataract": float(probs[1])
-            })
-
-        st.write("### LIME Explanation")
-        st.image(
-            lime_vis,
-            caption="Highlighted regions contributed positively to the predicted class.",
-            use_container_width=True
-        )
-
-        st.info(
-            "The highlighted image regions show which parts of the eye image "
-            "most influenced the model's prediction."
-        )
-
-with tab2:
-    st.header("Project Report")
-
-    st.link_button(
-        "My GitHub Repository",
-        "https://github.com/Neelima123079/cataract_classify"
-    )
-
-    pdf_url = "https://raw.githubusercontent.com/Neelima123079/cataract_classify/main/Cataract Classifier project report.pdf"
-    response = requests.get(pdf_url)
-
-    if response.status_code == 200:
-        st.download_button(
-            label="Download Report",
-            data=response.content,
-            file_name="Cataract_Classifier_Report.pdf",
-            mime="application/pdf"
-        )
-
-        if st.button("Show Report"):
-            with st.sidebar:
-                pdf_viewer(response.content)
-    else:
-        st.error("Failed to fetch PDF file. Please check the URL.")
+# Footer
+st.markdown("---")
+st.markdown("Developed for Explainable AI in Medical Diagnosis")

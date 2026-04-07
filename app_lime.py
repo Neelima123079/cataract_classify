@@ -16,7 +16,7 @@ from tensorflow.keras.models import Model
 # =========================
 WEIGHTS_PATH = "best_model_cataract1.h5"
 IMG_SIZE = 224
-CLASS_NAMES = ["Normal", "Cataract"]
+CLASS_NAMES = ["Cataract", "Normal"]
 
 # Reduced for memory safety
 LIME_NUM_SAMPLES = 120

@@ -111,7 +111,7 @@ if uploaded_file:
     image = Image.open(uploaded_file)
     image_np = preprocess(image)
 
-    st.image(image, caption="Uploaded Image", use_container_width=True)
+    st.image(lime_img, caption="LIME Explanation", use_container_width=True, clamp=True)
 
     # Prediction button
     if st.button("🔍 Run Prediction"):

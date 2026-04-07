@@ -1,1 +1,10 @@
 streamlit-pdf-viewer==0.0.17
+streamlit
+tensorflow
+numpy
+pillow
+requests
+lime
+scikit-image
+matplotlib
+streamlit-pdf-viewer

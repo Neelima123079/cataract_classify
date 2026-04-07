@@ -10,6 +10,7 @@ from skimage.segmentation import mark_boundaries
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
 from tensorflow.keras.models import Model
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 
 # =========================
 # CONFIG
@@ -18,7 +19,6 @@ WEIGHTS_PATH = "best_model_cataract1.h5"
 IMG_SIZE = 224
 CLASS_NAMES = ["Cataract", "Normal"]
 
-# Reduced for memory safety
 LIME_NUM_SAMPLES = 120
 LIME_NUM_FEATURES = 4
 
@@ -52,8 +52,6 @@ model = load_model()
 # =========================
 # PREPROCESS
 # =========================
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-
 def preprocess(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
@@ -75,10 +73,10 @@ def get_explainer():
 
 def explain(image_np):
     explainer = get_explainer()
-    lime_img = np.clip(lime_img, 0, 1)
+
     explanation = explainer.explain_instance(
         image_np.astype("double"),
-        classifier_fn=lambda x: model.predict(x),
+        classifier_fn=lambda x: model.predict(x, verbose=0),
         top_labels=2,
         hide_color=0,
         num_samples=LIME_NUM_SAMPLES
@@ -97,7 +95,10 @@ def explain(image_np):
     if temp.max() > 1:
         temp = temp / 255.0
 
-    return mark_boundaries(temp, mask), preds, pred_idx
+    lime_img = mark_boundaries(temp, mask)
+    lime_img = np.clip(lime_img, 0, 1)
+
+    return lime_img, preds, pred_idx
 
 # =========================
 # UI
@@ -107,13 +108,12 @@ st.title("Cataract Detection with Explainable AI")
 
 uploaded_file = st.file_uploader("Upload Eye Image", type=["jpg", "png", "jpeg"])
 
-if uploaded_file:
+if uploaded_file is not None:
     image = Image.open(uploaded_file)
     image_np = preprocess(image)
 
-    st.image(lime_img, caption="LIME Explanation", use_container_width=True, clamp=True)
+    st.image(image, caption="Uploaded Eye Image", use_container_width=True)
 
-    # Prediction button
     if st.button("🔍 Run Prediction"):
         preds = predict(image_np)
         pred_idx = int(np.argmax(preds))
@@ -121,14 +121,14 @@ if uploaded_file:
         st.success(f"Prediction: {CLASS_NAMES[pred_idx]}")
         st.write("Confidence:", float(preds[pred_idx]))
 
-    # LIME button (separate!)
     if st.button("🧠 Generate Explanation (LIME)"):
         with st.spinner("Generating explanation..."):
             lime_img, preds, pred_idx = explain(image_np)
 
+        st.success(f"Prediction: {CLASS_NAMES[pred_idx]}")
+        st.write("Confidence:", float(preds[pred_idx]))
         st.image(lime_img, caption="LIME Explanation", use_container_width=True)
 
-        # Free memory
         del lime_img
         gc.collect()
 

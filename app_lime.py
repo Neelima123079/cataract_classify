@@ -19,7 +19,8 @@ import os
 import streamlit as st
 import tensorflow as tf
 
-MODEL_PATH = "cataract_resaved.h5"
+MODEL_PATH = "cataract_final.keras"
+BINARY_SIGMOID_OUTPUT = False
 
 
 def load_model():

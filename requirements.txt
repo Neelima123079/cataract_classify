@@ -1,10 +1,10 @@
-streamlit-pdf-viewer==0.0.17
 streamlit
-tensorflow
-numpy
+tensorflow==2.15.1
+numpy==1.26.4
 pillow
 requests
 lime
 scikit-image
 matplotlib
 streamlit-pdf-viewer
+h5py

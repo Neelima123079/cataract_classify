@@ -52,10 +52,13 @@ model = load_model()
 # =========================
 # PREPROCESS
 # =========================
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
 def preprocess(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
-    arr = np.array(img).astype("float32") / 255.0
+    arr = np.array(img).astype("float32")
+    arr = preprocess_input(arr)
     return arr
 
 def predict(image_np):

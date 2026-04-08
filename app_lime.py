@@ -7,10 +7,6 @@ import gc
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
-from tensorflow.keras.models import Model
-
 # IMPORTANT:
 # use the SAME preprocessing used during training
 from keras.applications.resnet import preprocess_input
@@ -28,35 +24,11 @@ LIME_NUM_SAMPLES = 120
 LIME_NUM_FEATURES = 4
 
 # =========================
-# BUILD MODEL
+# LOAD FULL MODEL
 # =========================
-def build_model():
-    base_model = MobileNetV2(
-        input_shape=(IMG_SIZE, IMG_SIZE, 3),
-        include_top=False,
-        weights="imagenet",   # match training
-        alpha=0.35
-    )
-
-    # match training
-    for layer in base_model.layers:
-        layer.trainable = False
-
-    x = base_model.output
-    x = GlobalAveragePooling2D()(x)
-    x = Dense(100, activation="relu")(x)
-
-    # keep standard Dense unless your original create_model used something else
-    output = Dense(2, activation="softmax")(x)
-
-    model = Model(inputs=base_model.input, outputs=output)
-    return model
-
 @st.cache_resource
 def load_model():
-    model = build_model()
-    model.load_weights(WEIGHTS_PATH)
-    return model
+    return tf.keras.models.load_model(WEIGHTS_PATH, compile=False)
 
 model = load_model()
 

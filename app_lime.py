@@ -10,13 +10,18 @@ from skimage.segmentation import mark_boundaries
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
 from tensorflow.keras.models import Model
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+
+# IMPORTANT:
+# use the SAME preprocessing used during training
+from keras.applications.resnet import preprocess_input
 
 # =========================
 # CONFIG
 # =========================
 WEIGHTS_PATH = "best_model_cataract1.h5"
 IMG_SIZE = 224
+
+# Change this ONLY after checking train_generator.class_indices
 CLASS_NAMES = ["Cataract", "Normal"]
 
 LIME_NUM_SAMPLES = 120
@@ -29,14 +34,20 @@ def build_model():
     base_model = MobileNetV2(
         input_shape=(IMG_SIZE, IMG_SIZE, 3),
         include_top=False,
-        weights=None,
+        weights="imagenet",   # match training
         alpha=0.35
     )
+
+    # match training
+    for layer in base_model.layers:
+        layer.trainable = False
 
     x = base_model.output
     x = GlobalAveragePooling2D()(x)
     x = Dense(100, activation="relu")(x)
-    output = Dense(2, activation="softmax", use_bias=False)(x)
+
+    # keep standard Dense unless your original create_model used something else
+    output = Dense(2, activation="softmax")(x)
 
     model = Model(inputs=base_model.input, outputs=output)
     return model
@@ -52,12 +63,23 @@ model = load_model()
 # =========================
 # PREPROCESS
 # =========================
-def preprocess(img):
+def preprocess_for_model(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
     arr = np.array(img).astype("float32")
-    arr = preprocess_input(arr)
+    arr = preprocess_input(arr)   # same as training
     return arr
+
+def prepare_image_for_lime(img):
+    img = img.convert("RGB")
+    img = img.resize((IMG_SIZE, IMG_SIZE))
+    arr = np.array(img).astype("float32")
+    return arr
+
+def classifier_fn(images):
+    images = np.array(images).astype("float32")
+    images_pp = np.array([preprocess_input(img.copy()) for img in images])
+    return model.predict(images_pp, verbose=0)
 
 def predict(image_np):
     image_np = np.expand_dims(image_np, axis=0)
@@ -71,18 +93,18 @@ def predict(image_np):
 def get_explainer():
     return lime_image.LimeImageExplainer()
 
-def explain(image_np):
+def explain(image_for_lime, image_for_model):
     explainer = get_explainer()
 
     explanation = explainer.explain_instance(
-        image_np.astype("double"),
-        classifier_fn=lambda x: model.predict(x, verbose=0),
+        image_for_lime.astype("double"),
+        classifier_fn=classifier_fn,
         top_labels=2,
         hide_color=0,
         num_samples=LIME_NUM_SAMPLES
     )
 
-    preds = predict(image_np)
+    preds = predict(image_for_model)
     pred_idx = int(np.argmax(preds))
 
     temp, mask = explanation.get_image_and_mask(
@@ -110,20 +132,30 @@ uploaded_file = st.file_uploader("Upload Eye Image", type=["jpg", "png", "jpeg"]
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    image_np = preprocess(image)
+
+    image_for_model = preprocess_for_model(image)
+    image_for_lime = prepare_image_for_lime(image)
 
     st.image(image, caption="Uploaded Eye Image", use_container_width=True)
 
     if st.button("🔍 Run Prediction"):
-        preds = predict(image_np)
+        preds = predict(image_for_model)
         pred_idx = int(np.argmax(preds))
+
+        st.write("Raw prediction vector:", preds)
+        st.write(f"{CLASS_NAMES[0]} probability:", float(preds[0]))
+        st.write(f"{CLASS_NAMES[1]} probability:", float(preds[1]))
 
         st.success(f"Prediction: {CLASS_NAMES[pred_idx]}")
         st.write("Confidence:", float(preds[pred_idx]))
 
     if st.button("🧠 Generate Explanation (LIME)"):
         with st.spinner("Generating explanation..."):
-            lime_img, preds, pred_idx = explain(image_np)
+            lime_img, preds, pred_idx = explain(image_for_lime, image_for_model)
+
+        st.write("Raw prediction vector:", preds)
+        st.write(f"{CLASS_NAMES[0]} probability:", float(preds[0]))
+        st.write(f"{CLASS_NAMES[1]} probability:", float(preds[1]))
 
         st.success(f"Prediction: {CLASS_NAMES[pred_idx]}")
         st.write("Confidence:", float(preds[pred_idx]))
@@ -132,6 +164,5 @@ if uploaded_file is not None:
         del lime_img
         gc.collect()
 
-# Footer
 st.markdown("---")
 st.markdown("Developed for Explainable AI in Medical Diagnosis")

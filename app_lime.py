@@ -7,17 +7,13 @@ import gc
 from lime import lime_image
 from skimage.segmentation import mark_boundaries
 
-# IMPORTANT:
-# use the SAME preprocessing used during training
 from keras.applications.resnet import preprocess_input
 
 # =========================
 # CONFIG
 # =========================
-WEIGHTS_PATH = "best_model_cataract1.h5"
+MODEL_PATH = "best_model_cataract1.keras"
 IMG_SIZE = 224
-
-# Change this ONLY after checking train_generator.class_indices
 CLASS_NAMES = ["Cataract", "Normal"]
 
 LIME_NUM_SAMPLES = 120
@@ -28,7 +24,7 @@ LIME_NUM_FEATURES = 4
 # =========================
 @st.cache_resource
 def load_model():
-    return tf.keras.models.load_model(WEIGHTS_PATH, compile=False)
+    return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 model = load_model()
 
@@ -39,14 +35,13 @@ def preprocess_for_model(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
     arr = np.array(img).astype("float32")
-    arr = preprocess_input(arr)   # same as training
+    arr = preprocess_input(arr)
     return arr
 
 def prepare_image_for_lime(img):
     img = img.convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
-    arr = np.array(img).astype("float32")
-    return arr
+    return np.array(img).astype("float32")
 
 def classifier_fn(images):
     images = np.array(images).astype("float32")

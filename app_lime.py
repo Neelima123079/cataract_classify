@@ -274,7 +274,12 @@ def governance_decision(confidence, hmeg_score, human_trust, flags):
     if confidence >= GOV_CONF_THRESHOLD and hmeg_score >= GOV_HMEG_THRESHOLD and human_trust >= GOV_TRUST_THRESHOLD and len(flags) == 0:
         return "Approved"
     return "Review Required"
-
+def overlay_gradcam(original_img, heatmap):
+    heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
+    heatmap = np.uint8(255 * heatmap)
+    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+    overlay = cv2.addWeighted(original_img, 0.6, heatmap, 0.4, 0)
+    return overlay    
 # =========================
 # UI
 # =========================

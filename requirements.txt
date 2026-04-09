@@ -4,4 +4,6 @@ numpy
 pillow
 scikit-image
 lime
+opencv-python-headless
+shap
 h5py

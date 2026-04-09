@@ -109,35 +109,30 @@ def explain_lime(image_for_lime: np.ndarray, image_for_model: np.ndarray):
 # =========================
 def get_gradcam_heatmap(model, img_array, last_conv_layer_name):
     grad_model = tf.keras.models.Model(
-        [model.inputs],
-        [model.get_layer(last_conv_layer_name).output, model.output]
+        inputs=model.inputs,
+        outputs=[model.get_layer(last_conv_layer_name).output, model.output]
     )
 
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img_array, training=False)
+
         pred_index = tf.argmax(predictions[0])
-        class_channel = predictions[:, pred_index]
+        class_channel = tf.gather(predictions[0], pred_index)
 
     grads = tape.gradient(class_channel, conv_outputs)
+
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
     conv_outputs = conv_outputs[0]
 
-    heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
-    heatmap = tf.squeeze(heatmap)
+    heatmap = tf.reduce_sum(conv_outputs * pooled_grads, axis=-1)
+    heatmap = tf.maximum(heatmap, 0)
 
-    denom = tf.math.reduce_max(heatmap)
-    if float(denom) == 0.0:
-        return np.zeros((conv_outputs.shape[0], conv_outputs.shape[1]), dtype=np.float32)
+    max_val = tf.reduce_max(heatmap)
+    if float(max_val) == 0.0:
+        return np.zeros((heatmap.shape[0], heatmap.shape[1]), dtype=np.float32)
 
-    heatmap = tf.maximum(heatmap, 0) / denom
+    heatmap = heatmap / max_val
     return heatmap.numpy()
-
-def overlay_gradcam(original_img: np.ndarray, heatmap: np.ndarray) -> np.ndarray:
-    heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
-    heatmap = np.uint8(255 * heatmap)
-    heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-    overlay = cv2.addWeighted(original_img, 0.6, heatmap, 0.4, 0)
-    return overlay
 
 # =========================
 # SHAP
